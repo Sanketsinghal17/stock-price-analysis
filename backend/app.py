@@ -4,12 +4,12 @@ import yfinance as yf
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from tensorflow.keras.models import load_model
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 app = Flask(__name__)
 CORS(app)
-
 
 # ------------------- ROUTE 1: Fetch Historical Data -------------------
 @app.route('/api/history')
@@ -34,7 +34,7 @@ def get_history():
             if data.empty:
                 return jsonify({"error": f"No data found for {symbol} or {alt_symbol}"}), 404
             else:
-                symbol = alt_symbol  # Update to working one
+                symbol = alt_symbol
 
         data = data.reset_index()
         if isinstance(data.columns, pd.MultiIndex):
@@ -54,6 +54,7 @@ def get_history():
         return jsonify({"error": f"Error fetching history: {str(e)}"}), 500
 
 
+# ------------------- ROUTE 2: Predict Future Prices -------------------
 @app.route('/api/predict')
 def predict():
     try:
@@ -109,6 +110,35 @@ def predict():
     except Exception as e:
         return jsonify({"error": f"Prediction error: {str(e)}"}), 500
 
+
+# ------------------- 🧠 ROUTE 3: Model Accuracy Metrics -------------------
+@app.route('/api/metrics', methods=['GET'])
+def get_metrics():
+    try:
+        import os
+        import pandas as pd
+        file_path = "model_metrics.csv"
+
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Metrics file not found. Please train model first."}), 404
+
+        df = pd.read_csv(file_path)
+        if df.empty:
+            return jsonify({"error": "Metrics file is empty."}), 400
+
+        latest = df.iloc[-1].to_dict()
+        metrics = {
+            "MAE": round(float(latest.get("MAE", 0)), 3),
+            "MSE": round(float(latest.get("MSE", 0)), 3),
+            "RMSE": round(float(latest.get("RMSE", 0)), 3),
+            "R2_Score": round(float(latest.get("R2_Score", 0)), 3),
+            "MAPE": round(float(latest.get("MAPE", 0)), 3),
+            "Accuracy": round(float(latest.get("Accuracy", 0)), 2)
+        }
+
+        return jsonify(metrics)
+    except Exception as e:
+        return jsonify({"error": f"Error reading metrics: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
